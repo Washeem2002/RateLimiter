@@ -15,6 +15,9 @@ class UrlRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def rollback(self) -> None:
+        await self._session.rollback()
+
     async def get_by_idempotency_key(self, key: str) -> Url | None:
         stmt = select(Url).where(Url.idempotency_key == key)
         result = await self._session.execute(stmt)
