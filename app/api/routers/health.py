@@ -31,8 +31,10 @@ async def ready(
     try:
         await session.execute(text("SELECT 1"))
         pool = get_engine().pool
-        DB_POOL_SIZE.set(pool.size())
-        DB_POOL_CHECKED_OUT.set(pool.checkedout())
+        if hasattr(pool, "size"):
+            DB_POOL_SIZE.set(pool.size())
+        if hasattr(pool, "checkedout"):
+            DB_POOL_CHECKED_OUT.set(pool.checkedout())
     except Exception:
         db_status = "error"
 

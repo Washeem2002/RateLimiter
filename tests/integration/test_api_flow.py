@@ -1,3 +1,5 @@
+from datetime import UTC
+
 import pytest
 
 
@@ -62,9 +64,9 @@ async def test_redirect_not_found(client) -> None:
 
 @pytest.mark.asyncio
 async def test_expired_returns_410(client) -> None:
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    past = (datetime.now(UTC) - timedelta(days=1)).isoformat()
     created = await client.post(
         "/api/v1/urls",
         json={"long_url": "https://example.com/expired", "expires_at": past},

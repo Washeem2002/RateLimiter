@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from redis.asyncio import Redis
 from sqlalchemy.exc import IntegrityError
@@ -30,8 +31,8 @@ def _is_expired(url: Url) -> bool:
         return False
     exp = url.expires_at
     if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
-    return exp <= datetime.now(timezone.utc)
+        exp = exp.replace(tzinfo=UTC)
+    return exp <= datetime.now(UTC)
 
 
 def _to_response(url: Url, base_url: str) -> UrlResponse:
@@ -124,10 +125,11 @@ class UrlService:
             if exp:
                 exp_dt = datetime.fromisoformat(exp)
                 if exp_dt.tzinfo is None:
-                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
-                if exp_dt <= datetime.now(timezone.utc):
+                    exp_dt = exp_dt.replace(tzinfo=UTC)
+                if exp_dt <= datetime.now(UTC):
                     raise GoneError("short url has expired")
-            return cached["long_url"]
+            long_url: str = cached["long_url"]
+            return long_url
 
         url = await self._repo.get_by_code(code)
 
@@ -151,16 +153,25 @@ class UrlService:
 
         return url.long_url
 
-    async def record_click(self, code: str, meta: dict) -> None:
-        event = {
+    async def record_click(self, code: str, meta: dict[str, Any]) -> None:
+        event: dict[str, str | int | float] = {
             "short_code": code,
-            "clicked_at": datetime.now(timezone.utc).isoformat(),
-            "referrer": meta.get("referrer") or "",
-            "user_agent": meta.get("user_agent") or "",
-            "ip_hash": meta.get("ip_hash") or "",
+            "clicked_at": datetime.now(UTC).isoformat(),
+            "referrer": str(meta.get("referrer") or ""),
+            "user_agent": str(meta.get("user_agent") or ""),
+            "ip_hash": str(meta.get("ip_hash") or ""),
         }
         try:
-            await self._redis.xadd(self._settings.click_stream_key, event)
+            await self._redis.xadd(
+                self._settings.click_stream_key,
+                cast(
+                    dict[
+                        bytes | bytearray | memoryview | str | int | float,
+                        bytes | bytearray | memoryview | str | int | float,
+                    ],
+                    event,
+                ),
+            )
         except Exception:
             logger.warning("click_stream_publish_failed", code=code)
 

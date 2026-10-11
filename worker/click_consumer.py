@@ -89,7 +89,7 @@ class ClickConsumer:
         rows: list[dict] = []
         rollup: dict[tuple[str, date, str], int] = {}
 
-        for message_id, data in messages:
+        for _message_id, data in messages:
             try:
                 clicked_at = datetime.fromisoformat(data["clicked_at"])
             except (KeyError, ValueError):

@@ -45,7 +45,7 @@ class RateLimiter:
         now = time.time()
 
         try:
-            raw = await self._redis.eval(  # type: ignore[misc]
+            raw = await self._redis.eval(
                 _LUA_SCRIPT, 1, key, capacity, refill_rate, now, 1
             )
         except Exception:

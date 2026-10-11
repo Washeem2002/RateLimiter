@@ -15,11 +15,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from app.api.routers import health, redirect, urls
-from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler, unhandled_error_handler
-from app.infra.cache import UrlCache
 from app.infra.db import get_session
-from app.infra.rate_limiter import RateLimiter
 from app.infra.redis import get_redis
 from app.models.models import Base
 

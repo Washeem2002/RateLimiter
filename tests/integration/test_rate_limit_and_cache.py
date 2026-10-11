@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -126,7 +126,7 @@ async def test_lock_acquired_and_released(fake_redis) -> None:
 @pytest.mark.asyncio
 async def test_cache_ttl_capped_to_expiry(fake_redis) -> None:
     cache = UrlCache(fake_redis)
-    soon = (datetime.now(timezone.utc) + timedelta(seconds=10)).isoformat()
+    soon = (datetime.now(UTC) + timedelta(seconds=10)).isoformat()
     await cache.set_found("ttlcode", {"long_url": "https://example.com", "expires_at": soon})
     ttl = await fake_redis.ttl("url:ttlcode")
     assert 0 < ttl <= 10

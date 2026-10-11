@@ -1,14 +1,19 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import Insert as PgInsert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import Insert as SqliteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import ClickDaily, ClickEvent, ClickReferrerDaily
+from app.models.models import Base, ClickDaily, ClickEvent, ClickReferrerDaily
+
+DialectInsert = PgInsert | SqliteInsert
 
 
-def _insert_for(session: AsyncSession, model):
+def _insert_for(session: AsyncSession, model: type[Base]) -> DialectInsert:
     if session.bind is not None and session.bind.dialect.name == "sqlite":
         return sqlite_insert(model)
     return pg_insert(model)
@@ -18,7 +23,7 @@ class ClickRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def bulk_insert(self, events: list[dict]) -> None:
+    async def bulk_insert(self, events: list[dict[str, Any]]) -> None:
         if not events:
             return
         stmt = _insert_for(self._session, ClickEvent).values(events)

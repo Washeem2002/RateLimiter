@@ -35,7 +35,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "ASYNC"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "worker"]
@@ -43,7 +43,7 @@ known-first-party = ["app", "worker"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+plugins = ["pydantic.mypy"]
 warn_unused_configs = true
 disallow_untyped_defs = true
 [[tool.mypy.overrides]]

@@ -1,5 +1,5 @@
-import pytest
 import fakeredis.aioredis
+import pytest
 
 from app.core.errors import RateLimitError
 from app.infra.rate_limiter import RateLimiter

@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Response, status
 
-from app.api.deps import get_client_ip, get_rate_limiter, get_url_service, hash_client_ip
+from app.api.deps import get_client_ip, get_rate_limiter, get_url_service
 from app.core.config import get_settings
 from app.infra.rate_limiter import RateLimiter
 from app.schemas.schemas import UrlCreateRequest, UrlMetadataResponse, UrlResponse, UrlStatsResponse

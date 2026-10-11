@@ -1,3 +1,7 @@
+from redis.asyncio import Redis
+
+from app.repositories.url_repo import UrlRepository
+
 ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 BASE = 62
 
@@ -26,7 +30,7 @@ def base62_decode(code: str) -> int:
 
 
 class IdGenerator:
-    def __init__(self, redis, repo, offset: int) -> None:
+    def __init__(self, redis: Redis, repo: UrlRepository, offset: int) -> None:
         self._redis = redis
         self._repo = repo
         self._offset = offset

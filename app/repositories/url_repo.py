@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Url, UrlSequence
@@ -50,9 +51,9 @@ class UrlRepository:
             .where(Url.short_code == code, Url.is_deleted.is_(False))
             .values(is_deleted=True)
         )
-        result = await self._session.execute(stmt)
+        cursor = await self._session.execute(stmt)
         await self._session.commit()
-        return result.rowcount > 0
+        return cast(CursorResult[Any], cursor).rowcount > 0
 
     async def sequence_next(self, name: str) -> int:
         from sqlalchemy.dialects.postgresql import insert as pg_insert

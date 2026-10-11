@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from redis.asyncio import Redis
@@ -41,7 +41,8 @@ class UrlCache:
             return NOT_FOUND
 
         CACHE_LOOKUPS.labels(result="hit").inc()
-        return json.loads(raw)
+        parsed: dict[str, Any] = json.loads(raw)
+        return parsed
 
     async def set_found(self, code: str, payload: dict[str, Any]) -> None:
         expires_at = payload.get("expires_at")
@@ -50,8 +51,8 @@ class UrlCache:
             try:
                 exp = datetime.fromisoformat(expires_at)
                 if exp.tzinfo is None:
-                    exp = exp.replace(tzinfo=timezone.utc)
-                remaining = (exp - datetime.now(timezone.utc)).total_seconds()
+                    exp = exp.replace(tzinfo=UTC)
+                remaining = (exp - datetime.now(UTC)).total_seconds()
                 ttl = max(1, min(ttl, int(remaining)))
             except ValueError:
                 pass

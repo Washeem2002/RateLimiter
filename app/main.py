@@ -1,9 +1,8 @@
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
@@ -41,11 +40,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unhandled_error_handler)
 
     @app.middleware("http")
-    async def metrics_middleware(request: Request, call_next):
+    async def metrics_middleware(
+        request: Request, call_next: Callable[..., Awaitable[Response]]
+    ) -> Response:
         method = request.method
         path = request.url.path
 
