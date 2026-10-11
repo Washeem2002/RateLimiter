@@ -9,24 +9,20 @@ from app.infra.rate_limiter import RateLimiter
 
 @pytest.mark.asyncio
 async def test_create_rate_limit_returns_429(client) -> None:
-    limit = get_settings().rate_limit_create_per_min
+    settings = get_settings()
+    original = settings.rate_limit_create_per_min
+    settings.rate_limit_create_per_min = 3
 
-    statuses = []
-    for _ in range(limit + 3):
-        resp = await client.post("/api/v1/urls", json={"long_url": "https://example.com"})
-        statuses.append(resp.status_code)
+    try:
+        statuses = []
+        for _ in range(8):
+            resp = await client.post("/api/v1/urls", json={"long_url": "https://example.com"})
+            statuses.append(resp.status_code)
 
-    assert 429 in statuses
-    blocked = [r for r in await _collect_rejected(client, limit + 3)]
-    assert blocked.headers.get("Retry-After") is not None
-
-
-async def _collect_rejected(client, attempts):
-    for _ in range(attempts):
-        resp = await client.post("/api/v1/urls", json={"long_url": "https://example.com"})
-        if resp.status_code == 429:
-            yield resp
-            return
+        assert 429 in statuses
+        assert statuses.count(429) >= 1
+    finally:
+        settings.rate_limit_create_per_min = original
 
 
 @pytest.mark.asyncio
@@ -37,33 +33,74 @@ async def test_rate_limit_headers_present(client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_rate_limited_includes_retry_after(client) -> None:
+    settings = get_settings()
+    original = settings.rate_limit_create_per_min
+    settings.rate_limit_create_per_min = 1
+
+    try:
+        await client.post("/api/v1/urls", json={"long_url": "https://example.com/a"})
+        blocked = await client.post("/api/v1/urls", json={"long_url": "https://example.com/b"})
+        assert blocked.status_code == 429
+        assert blocked.headers.get("Retry-After") is not None
+    finally:
+        settings.rate_limit_create_per_min = original
+
+
+@pytest.mark.asyncio
 async def test_redirect_rate_limit_returns_429(client) -> None:
-    await client.post("/api/v1/urls", json={"long_url": "https://example.com/rl"})
-    limit = get_settings().rate_limit_redirect_per_min
+    settings = get_settings()
+    original = settings.rate_limit_redirect_per_min
+    settings.rate_limit_redirect_per_min = 5
 
-    codes = []
-    for _ in range(limit + 5):
-        resp = await client.get("/nonexistent", follow_redirects=False)
-        codes.append(resp.status_code)
+    try:
+        codes = []
+        for _ in range(15):
+            resp = await client.get("/nonexistent", follow_redirects=False)
+            codes.append(resp.status_code)
 
-    assert 429 in codes
+        assert 429 in codes
+    finally:
+        settings.rate_limit_redirect_per_min = original
 
 
 @pytest.mark.asyncio
 async def test_cache_hit_and_miss(client, fake_redis) -> None:
-    await client.post(
-        "/api/v1/urls", json={"long_url": "https://example.com/cached", "custom_alias": "cachecode"}
-    )
-
     cache = UrlCache(fake_redis)
+
     assert await cache.get("cachecode") is None
 
-    first = await client.get("/cachecode", follow_redirects=False)
-    assert first.status_code == 302
+    await client.post(
+        "/api/v1/urls",
+        json={"long_url": "https://example.com/cached", "custom_alias": "cachecode"},
+    )
 
     cached = await cache.get("cachecode")
     assert isinstance(cached, dict)
     assert cached["long_url"] == "https://example.com/cached"
+
+    resp = await client.get("/cachecode", follow_redirects=False)
+    assert resp.status_code == 302
+
+
+@pytest.mark.asyncio
+async def test_redirect_populates_cache_on_miss(client, fake_redis) -> None:
+    cache = UrlCache(fake_redis)
+
+    await client.post(
+        "/api/v1/urls",
+        json={"long_url": "https://example.com/warm", "custom_alias": "warmcode"},
+    )
+    await cache.invalidate("warmcode")
+
+    assert await cache.get("warmcode") is None
+
+    resp = await client.get("/warmcode", follow_redirects=False)
+    assert resp.status_code == 302
+
+    cached = await cache.get("warmcode")
+    assert isinstance(cached, dict)
+    assert cached["long_url"] == "https://example.com/warm"
 
 
 @pytest.mark.asyncio
@@ -96,9 +133,7 @@ async def test_cache_ttl_capped_to_expiry(fake_redis) -> None:
 
 
 @pytest.mark.asyncio
-async def test_rate_limiter_isolated_from_redirect_down(
-    client, fake_redis
-) -> None:
+async def test_rate_limiter_isolated_per_endpoint(fake_redis) -> None:
     limiter = RateLimiter(fake_redis)
     result = await limiter.check("redirect", "someone", 300)
     assert result.remaining >= 0

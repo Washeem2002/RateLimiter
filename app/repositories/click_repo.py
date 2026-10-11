@@ -1,10 +1,17 @@
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import ClickDaily, ClickEvent, ClickReferrerDaily
+
+
+def _insert_for(session: AsyncSession, model):
+    if session.bind is not None and session.bind.dialect.name == "sqlite":
+        return sqlite_insert(model)
+    return pg_insert(model)
 
 
 class ClickRepository:
@@ -14,13 +21,13 @@ class ClickRepository:
     async def bulk_insert(self, events: list[dict]) -> None:
         if not events:
             return
-        stmt = pg_insert(ClickEvent).values(events)
+        stmt = _insert_for(self._session, ClickEvent).values(events)
         await self._session.execute(stmt)
         await self._session.commit()
 
     async def upsert_daily_rollup(self, short_code: str, day: date, delta: int) -> None:
         stmt = (
-            pg_insert(ClickDaily)
+            _insert_for(self._session, ClickDaily)
             .values(short_code=short_code, day=day, count=delta)
             .on_conflict_do_update(
                 index_elements=[ClickDaily.short_code, ClickDaily.day],
@@ -33,7 +40,7 @@ class ClickRepository:
         self, short_code: str, day: date, referrer: str, delta: int
     ) -> None:
         stmt = (
-            pg_insert(ClickReferrerDaily)
+            _insert_for(self._session, ClickReferrerDaily)
             .values(short_code=short_code, day=day, referrer=referrer, count=delta)
             .on_conflict_do_update(
                 index_elements=[

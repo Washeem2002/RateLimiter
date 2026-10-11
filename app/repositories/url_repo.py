@@ -56,9 +56,13 @@ class UrlRepository:
 
     async def sequence_next(self, name: str) -> int:
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        is_sqlite = self._session.bind is not None and self._session.bind.dialect.name == "sqlite"
+        insert_fn = sqlite_insert if is_sqlite else pg_insert
 
         stmt = (
-            pg_insert(UrlSequence)
+            insert_fn(UrlSequence)
             .values(id=name, value=1)
             .on_conflict_do_update(
                 index_elements=[UrlSequence.id],

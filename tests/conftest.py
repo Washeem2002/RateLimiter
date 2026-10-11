@@ -18,12 +18,10 @@ from app.api.routers import health, redirect, urls
 from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler, unhandled_error_handler
 from app.infra.cache import UrlCache
+from app.infra.db import get_session
 from app.infra.rate_limiter import RateLimiter
+from app.infra.redis import get_redis
 from app.models.models import Base
-from app.repositories.click_repo import ClickRepository
-from app.repositories.url_repo import UrlRepository
-from app.services.id_generator import IdGenerator
-from app.services.url_service import UrlService
 
 
 @pytest.fixture
@@ -52,27 +50,16 @@ async def fake_redis() -> AsyncIterator:
 
 
 def build_app(session_factory, redis) -> FastAPI:
-    settings = get_settings()
-    cache = UrlCache(redis)
-    limiter = RateLimiter(redis)
-
     app = FastAPI()
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)
 
-    def make_service():
-        session = session_factory()
-        return UrlService(
-            UrlRepository(session),
-            ClickRepository(session),
-            IdGenerator(redis, UrlRepository(session), settings.id_counter_offset),
-            cache,
-            redis,
-            settings,
-        )
+    async def override_session():
+        async with session_factory() as session:
+            yield session
 
-    app.dependency_overrides[get_url_service] = make_service
-    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_redis] = lambda: redis
 
     app.include_router(urls.router)
     app.include_router(health.router)

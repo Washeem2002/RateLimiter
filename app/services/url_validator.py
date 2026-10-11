@@ -36,7 +36,7 @@ def _is_private_host(hostname: str) -> bool:
     )
 
 
-def validate_and_normalize_url(raw_url: str, base_host: str) -> str:
+def validate_and_normalize_url(raw_url: str, base_url: str) -> str:
     candidate = raw_url.strip()
 
     if not candidate:
@@ -52,6 +52,8 @@ def validate_and_normalize_url(raw_url: str, base_host: str) -> str:
     hostname = parsed.hostname
     if not hostname:
         raise ValidationAppError("long_url must include a host")
+
+    base_host = urlparse(base_url).hostname or base_url
 
     if hostname == base_host or hostname.endswith("." + base_host):
         raise ValidationAppError("long_url must not reference this service")
